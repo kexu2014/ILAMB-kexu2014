@@ -538,7 +538,7 @@ class ConfCO2(Confrontation):
     
     def confront(self,m):
         
-        flagRelationshipInd = True
+        flagRelationshipInd = False
         if flagRelationshipInd:
             self.relationshipInd(m)
             
@@ -798,30 +798,15 @@ class ConfCO2(Confrontation):
         # exponential. The score for the model is then the arithmetic
         # mean across sites.
         #SampTmp = -np.clip(np.abs(mod_amp.data-obs_amp.data)/obs_amp.data, 0, 6)
+       
         
-        print("mod_amp.data:")
-        print(mod_amp.data)
-        print("obs_amp.data:")
-        print(obs_amp.data)
-        SampTmp = mod_amp.data/obs_amp.data
-        print("SampTmp:")
-        print(SampTmp)
         
         Samp = Variable(name  = "Amplitude Score global",
                         unit  = "1",
                         #avoid underflow error
-                        data  = np.exp(-np.abs(mod_amp.data/obs_amp.data - 1)).mean())
+                        data  = np.exp(-np.abs(np.array(mod_amp.data, dtype = np.float)/np.array(obs_amp.data, dtype = np.float) - 1)).mean())
         
-        '''
-        SampTmp = np.abs(mod_amp.data-obs_amp.data)/obs_amp.data
         
-        whrSampTmp = SampTmp.data[(indObs.lat > 8) * (indObs.lat < 23)]
-        maskLat = np.repeat(latTro, len(indObs.lon))
-        maskLon = np.tile(indObs.lon, len(latTro))
-        indObs =  indObs.extractDatasites(lat = maskLat,
-                                          lon = maskLon)
-        
-        '''
 
         # Interannual variability score: similar to the amplitude
         # score, we also score the relative error in the stdev(iav)
@@ -830,7 +815,8 @@ class ConfCO2(Confrontation):
         mstd = miav.data.std(axis=0)
         Siav = Variable(name  = "Interannual Variability Score global",
                         unit  = "1",
-                        data  = np.exp(-np.abs(mstd-ostd)/ostd).mean())
+                        #avoid underflow error
+                        data  = np.exp(-np.abs(np.array(mstd, dtype = np.float)/np.array(ostd, dtype = np.float) - 1)).mean())
 
 
         # Min/Max Phase score: for each site we compute the phase
