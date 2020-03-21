@@ -537,15 +537,14 @@ class ConfCO2(Confrontation):
                 
     
     def confront(self,m):
-
-        # Grab the data
-        obs,mod= self.stageData(m)
         
         flagRelationshipInd = True
         if flagRelationshipInd:
             self.relationshipInd(m)
-        
-        
+            
+            
+        # Grab the data
+        obs,mod= self.stageData(m)
 
         # Compute amplitude, min and max phase, and annual cycle as numpy data arrays
         ocyc,ot,otb = _cycleShape(obs)
@@ -650,8 +649,12 @@ class ConfCO2(Confrontation):
                                 ndata = mod.ndata,
                                 lat   = mod.lat,
                                 lon   = mod.lon)
-
-
+        '''
+        print("obs_amp:")
+        print(obs_amp)
+        print("mod_amp")
+        print(mod_amp)
+        '''
 
         #ccgcrv trend, longtime scale, seasonal (harmonics), smooth data for obs
         #placeholder for ccgObsTrend, ccgObsPoly, ccgObsIav, ccgObsFun, ccgObsHarmo, ccgObsSmooth
@@ -789,16 +792,36 @@ class ConfCO2(Confrontation):
 
 
 
-
-
         #calculate score:
         # Amplitude score: for each site we compute the relative error
         # in amplitude and then score each site using the
         # exponential. The score for the model is then the arithmetic
         # mean across sites.
+        #SampTmp = -np.clip(np.abs(mod_amp.data-obs_amp.data)/obs_amp.data, 0, 6)
+        
+        print("mod_amp.data:")
+        print(mod_amp.data)
+        print("obs_amp.data:")
+        print(obs_amp.data)
+        SampTmp = mod_amp.data/obs_amp.data
+        print("SampTmp:")
+        print(SampTmp)
+        
         Samp = Variable(name  = "Amplitude Score global",
                         unit  = "1",
-                        data  = np.exp(-np.abs(mod_amp.data-obs_amp.data)/obs_amp.data).mean())
+                        #avoid underflow error
+                        data  = np.exp(-np.abs(mod_amp.data/obs_amp.data - 1)).mean())
+        
+        '''
+        SampTmp = np.abs(mod_amp.data-obs_amp.data)/obs_amp.data
+        
+        whrSampTmp = SampTmp.data[(indObs.lat > 8) * (indObs.lat < 23)]
+        maskLat = np.repeat(latTro, len(indObs.lon))
+        maskLon = np.tile(indObs.lon, len(latTro))
+        indObs =  indObs.extractDatasites(lat = maskLat,
+                                          lon = maskLon)
+        
+        '''
 
         # Interannual variability score: similar to the amplitude
         # score, we also score the relative error in the stdev(iav)
