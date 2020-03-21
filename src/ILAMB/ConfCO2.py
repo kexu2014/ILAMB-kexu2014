@@ -370,10 +370,7 @@ class ConfCO2(Confrontation):
                    obs.data = obs.data - OCNco2Emu.data - FFco2Emu.data
                    mod.trim(t=[tmin, tmax])
 
-               '''
-               print("obs after subtracting OCN/FF: ")
-               print(obs)
-               '''
+               
 
 
         
@@ -389,7 +386,45 @@ class ConfCO2(Confrontation):
         
     def relationshipInd(self,m):
         #Before plotting relationship between iav of co2 or co2 growth rate and iav of other variables, e.g. tas in this case, prepare the iav of independent variable at the same time.
+        
+        #get obs of independent variable
+        indObs = Variable(filename       = "/no_backup/GroupData/kxu/DATA/tas/CRU/tas_0.5x0.5.nc",
+                          variable_name  = "tas",
+                          #alternate_vars = self.alternate_vars,
+                          t0 = None ,
+                          tf = None)
+        
+        #grab tropical area
+        latTro = indObs.lat[(indObs.lat > -23) * (indObs.lat < 23)]
+        maskLat = np.repeat(latTro, len(indObs.lon))
+        maskLon = np.tile(indObs.lon, len(latTro))
+        indObs =  indObs.extractDatasites(lat = maskLat,
+                                          lon = maskLon)
+      
+        #grab tropical land area
+        whrLand = np.where(indObs.data[1,:].mask==False)
+        indObsLand = copy.deepcopy(indObs)
+        indObsLand.data = indObs.data[:, whrLand]
 
+
+        #detrending for indObsLand
+        cc = copy.deepcopy(indObsLand)
+        cc.data = np.mean(indObsLand.data, axis=2, keepdims = False)
+        cc.ndata = 1
+        var = copy.deepcopy(cc)
+        j = np.where(var.data.mask==False)[0]
+        t = var.time[j]
+        x = var.data[j,0]
+        p = np.polyfit(t,x,2)
+        bb = np.polyval(p,var.time)
+        var.data[j,0] -= bb
+        
+        indObsLandDtr = copy.deepcopy(var)
+        
+
+
+        #-------model output tas ---------------------
+        
         #get reference co2 obs to grab the time
         co2Obs = Variable(filename       = self.source,
                        variable_name  = self.variable,
@@ -397,98 +432,6 @@ class ConfCO2(Confrontation):
                        t0 = None if len(self.study_limits) != 2 else self.study_limits[0],
                        tf = None if len(self.study_limits) != 2 else self.study_limits[1])
 
-       
-
-        #get obs of independent variable
-        indObs = Variable(filename       = "/no_backup/GroupData/kxu/DATA/tas/CRU/tas_0.5x0.5.nc",
-                          variable_name  = "tas",
-                          #alternate_vars = self.alternate_vars,
-                          t0 = None ,
-                          tf = None)
-        print("indObs:")
-        print(indObs)
-
-
-        latTro = indObs.lat[(indObs.lat > -23) * (indObs.lat < 23)]
-        
-        
-        print(latTro)
-        print(np.repeat(latTro, len(indObs.lon))[1:10])
-        print(np.tile(indObs.lon, len(latTro))[1:10])
-        
-        
-        maskLat = np.repeat(latTro, len(indObs.lon))
-        maskLon = np.tile(indObs.lon, len(latTro))
-        
-        print(len(maskLat))
-        print(len(maskLon))
-
-        indObs =  indObs.extractDatasites(lat = maskLat,
-                                          lon = maskLon)
-
-        print("indObs after mask:")
-        print(indObs)
-
-        #indObsDtr = _detrend(indObs)
-        print(indObs.data)
-
-        whrLand = np.where(indObs.data[1,:].mask==False)
-        print("whrLand")
-        print(whrLand)
-
-
-
-        indObsLand = copy.deepcopy(indObs)
-        indObsLand.data = indObs.data[:, whrLand]
-
-        print("indObsLand")
-        print(indObsLand)
-
-
-        #detrending for obs
-        cc = copy.deepcopy(indObsLand)
-        cc.data = np.mean(indObsLand.data, axis=2, keepdims = False)
-        cc.ndata = 1
-        print("spatial average np.mean axis 2:")
-        print(cc)
-
-
-        var = copy.deepcopy(cc)
-
-        j = np.where(var.data.mask==False)[0]
-        print("j")
-        print(j)
-        #t = var.time[j[0]]
-        print("var.time")
-        print(var.time)
-
-        t = var.time[j]
-        print("t")
-        print(t)
-        x = var.data[j,0]
-        print("x")
-        print(x)
-        p = np.polyfit(t,x,2)
-        print("p")
-        print(p)
-        #var.data.data[:,i] -= np.polyval(p,var.time)
-        bb = np.polyval(p,var.time)
-        print("bb")
-        print(bb)
-        var.data[j,0] -= bb
-
-
-
-        indObsLandDtr = copy.deepcopy(var)
-        print("detrending the spatial average over land mask:")
-        print(indObsLandDtr)
-
-
-
-        #-------model output tas ---------------------
-        #whrLandTroLat = indObs.lat[whrLand]
-        print(indObs.lat[whrLand])
-        indObs.lon[whrLand]
 
         #get the model output of independent variable
         indModLand = m.extractTimeSeries("tas",
@@ -497,98 +440,44 @@ class ConfCO2(Confrontation):
                                          final_time   = co2Obs.time_bnds[-1,1],
                                          lats         = indObs.lat[whrLand],
                                          lons         = indObs.lon[whrLand])
-        print("indModLand:")
-        print(indModLand)
-
+      
 
         #detrending for mod independent-----------
-
         cc = copy.deepcopy(indModLand)
         cc.data = np.mean(indModLand.data, axis=1, keepdims= True)
         cc.ndata = 1
-        print("spatial average of mod np.mean axis 1:")
-        print(cc)
-
-
         var = copy.deepcopy(cc)
-
         j = np.where(var.data.mask==False)[0]
-        print("j")
-        print(j)
-        #t = var.time[j[0]]
-        print("var.time")
-        print(var.time)
-
         t = var.time[j]
-        print("t")
-        print(t)
-        print
         x = var.data[j,0]
-        print("x")
-        print(x)
         p = np.polyfit(t,x,2)
-        print("p")
-        print(p)
         #var.data.data[:,i] -= np.polyval(p,var.time)
         bb = np.polyval(p,var.time)
-        print("bb")
-        print(bb)
         var.data[j,0] -= bb
-
-
-
         indModLandDtr = copy.deepcopy(var)
-        print("detrending the spatial average over land mask:")
-        print(indModLandDtr)
-
+        
 
 
 
         ###calcualte iav of ind obs and ind mod----------
 
-        # Compute amplitude, min and max phase, and annual cycle as numpy data arrays
+        # Compute harmonics first
         ocyc,ot,otb = _cycleShape(indObsLandDtr)
-        #print(ocyc)
-        #print(ot)
-        #print(otb)
         mcyc,mt,mtb = _cycleShape(indModLandDtr)
 
-        n           = 1 #len(maskLat)#len(self.lbls)
+        n           = 1
         obs_amp     = np.zeros(n); obs_maxp = np.zeros(n); obs_minp = np.zeros(n)
         mod_amp     = np.zeros(n); mod_maxp = np.zeros(n); mod_minp = np.zeros(n)
         obs_cyc     = np.zeros((366,n)); mod_cyc = np.zeros((366,n));
         well_define = np.zeros(n)
-        #print("obs_amp")
-        #print(obs_amp)
-        #print("mod_amp")
-        #print(mod_amp)
-        #print("obs_cyc"); print(obs_cyc)
+      
 
         for i in range(1,n):
-            #print(i)
-            #print(site)
             obs_amp[i],obs_maxp[i],obs_minp[i],obs_cyc[:,i] = _siteCharacteristics(ot,ocyc[...,i])
-            #print("siteCha function:")
-            #print(_siteCharacteristics(ot,ocyc[...,i]))
-            #print("obs_amp[i]:")
-            #print(obs_amp[i])
             mod_amp[i],mod_maxp[i],mod_minp[i],mod_cyc[:,i] = _siteCharacteristics(mt,mcyc[...,i])
-        #print("site Chara model:")
-        #print(_siteCharacteristics(mt,mcyc[...,i]))
-        #print("mod_amp[i]")
-        #print(mod_amp[i])
-        #print("_phase function:")
-        #print(_phaseWellDefined(obs.time,obs.data[:,i]))
-
-
-        #well_define[i] = _phaseWellDefined(obs.time,obs.data[:,i])
-        #well_define /= well_define.sum()
-        #print(obs_amp)
-        #print(mod_amp)
-        # Write out ILAMB variables for observed quantities
-        #print(np.errstate(under='ignore'))
+       
         obs = copy.deepcopy(indObsLandDtr)
-        mod = indModLandDtr
+        mod = copy.deepcopy(indModLandDtr)
 
 
         with np.errstate(under='ignore'):
@@ -600,8 +489,7 @@ class ConfCO2(Confrontation):
                                 lon   = obs.lon,
                                 time  = ot,
                                 time_bnds = otb)
-            #print("ocyc")
-            #print(ocyc)
+           
             oiav     = Variable(name  = "iav", # deseasonalized interannual variability
                                 unit  = obs.unit,
                                 data  = obs.data-il.ExtendAnnualCycle(obs.time,ocyc.data,ocyc.time),
@@ -610,46 +498,8 @@ class ConfCO2(Confrontation):
                                 lat   = obs.lat,
                                 lon   = obs.lon,
                                 time_bnds = obs.time_bnds)
-            print("oiav")
-            print(oiav)
-            ocycf    = Variable(name  = "cycle_fine", # finely sampled cycle from cubic interpolation
-                                unit  = obs.unit,
-                                data  = obs_cyc,
-                                time  = np.linspace(0,365,366),
-                                ndata = obs.ndata,
-                                lat   = obs.lat,
-                                lon   = obs.lon)
-            #print("ocycf")
-            #print(ocycf)
-            obs_amp  = Variable(name  = "amp", # mean amplitude over time period
-                                unit  = obs.unit,
-                                data  = obs_amp,
-                                ndata = obs.ndata,
-                                lat   = obs.lat,
-                                lon   = obs.lon)
-            #print("obs_amp")
-            #print(obs_amp)
-            obs_maxp = Variable(name  = "maxp", # Julian day of the maximum of the annual cycle
-                                unit  = "d",
-                                data  = obs_maxp,
-                                ndata = obs.ndata,
-                                lat   = obs.lat,
-                                lon   = obs.lon)
-            #print("obs_maxp")
-            #print(obs_maxp)
-            obs_minp = Variable(name  = "minp", # Julian day of the minimum of the annual cycle
-                                unit  = "d",
-                                data  = obs_minp,
-                                ndata = obs.ndata,
-                                lat   = obs.lat,
-                                lon   = obs.lon)
-        #print("obs_minp")
-        #print(obs_minp)
-        #print("oiav")
-        #print(oiav)
-        #print("ocyc")
-        #print(ocyc)
-
+        
+        
         # Write out ILAMB variables for modeled quantities
         mcyc     = Variable(name  = "cycle", # mean annual cycle
                             unit  = mod.unit,
@@ -667,32 +517,7 @@ class ConfCO2(Confrontation):
                             lat   = mod.lat,
                             lon   = mod.lon,
                             time_bnds = mod.time_bnds)
-        print(miav)
-        mcycf    = Variable(name  = "cycle_fine", # finely sampled cycle from cubic interpolation
-                            unit  = mod.unit,
-                            data  = mod_cyc,
-                            time  = np.linspace(0,365,366),
-                            ndata = mod.ndata,
-                            lat   = mod.lat,
-                            lon   = mod.lon)
-        mod_amp  = Variable(name  = "amp", # mean amplitude over time period
-                            unit  = mod.unit,
-                            data  = mod_amp,
-                            ndata = mod.ndata,
-                            lat   = mod.lat,
-                            lon   = mod.lon)
-        mod_maxp = Variable(name  = "maxp", # Julian day of the maximum of the annual cycle
-                            unit  = "d",
-                            data  = mod_maxp,
-                            ndata = mod.ndata,
-                            lat   = mod.lat,
-                            lon   = mod.lon)
-        mod_minp = Variable(name  = "minp", # Julian day of the minimum of the annual cycle
-                            unit  = "d",
-                            data  = mod_minp,
-                            ndata = mod.ndata,
-                            lat   = mod.lat,
-                            lon   = mod.lon)
+       
 
 
 
@@ -702,36 +527,24 @@ class ConfCO2(Confrontation):
             os.mkdir((os.path.join(self.output_path, "tas/")))
         with Dataset(os.path.join(self.output_path,"tas/%s_%s.nc" % ("tas",m.name)),mode="w") as results:
             results.setncatts({"name" :m.name, "color":m.color})
-            for v in [mod,mcyc,miav,mcycf,mod_maxp,mod_minp,mod_amp]:
+            for v in [mod,mcyc,miav]:
                 v.toNetCDF4(results,group="MeanState")
 
         with Dataset(os.path.join(self.output_path,"tas/tas_CRU_Benchmark.nc"),mode="w") as results:
             results.setncatts({"name" :"Benchmark", "color":np.asarray([0.5,0.5,0.5])})
-            for v in [obs,ocyc,oiav,ocycf,obs_maxp,obs_minp,obs_amp]:
+            for v in [obs,ocyc,oiav]:
                 v.toNetCDF4(results,group="MeanState")
                 
     
     def confront(self,m):
-
-        # Grab the data
-        obs,mod= self.stageData(m)
         
-        flagRelationshipInd = True
+        flagRelationshipInd = False
         if flagRelationshipInd:
             self.relationshipInd(m)
-        
-        '''
-        # Remove the trend via quadradic polynomial
-        obs_bftDtr = copy.deepcopy(obs)
-        obs = _detrend(obs)
-        mod_bftDtr = copy.deepcopy(mod)
-        print("mod_bftDtr:")
-        print(mod_bftDtr)
-        print(mod_bftDtr.data)
-        mod = _detrend(mod)
-        print("mod.data:")
-        print(mod.data)
-        '''
+            
+            
+        # Grab the data
+        obs,mod= self.stageData(m)
 
         # Compute amplitude, min and max phase, and annual cycle as numpy data arrays
         ocyc,ot,otb = _cycleShape(obs)
@@ -765,10 +578,7 @@ class ConfCO2(Confrontation):
                                 lat   = obs.lat,
                                 lon   = obs.lon,
                                 time_bnds = obs.time_bnds)
-            '''
-            print("oiav:")
-            print(oiav)
-            '''
+            
             
             ocycf    = Variable(name  = "cycle_fine", # finely sampled cycle from cubic interpolation
                                 unit  = obs.unit,
@@ -813,10 +623,7 @@ class ConfCO2(Confrontation):
                                 lat   = mod.lat,
                                 lon   = mod.lon,
                                 time_bnds = mod.time_bnds)
-            '''
-            print("miav.data:")
-            print(miav.data)
-            '''
+            
             mcycf    = Variable(name  = "cycle_fine", # finely sampled cycle from cubic interpolation
                                 unit  = mod.unit,
                                 data  = mod_cyc,
@@ -842,8 +649,12 @@ class ConfCO2(Confrontation):
                                 ndata = mod.ndata,
                                 lat   = mod.lat,
                                 lon   = mod.lon)
-
-
+        '''
+        print("obs_amp:")
+        print(obs_amp)
+        print("mod_amp")
+        print(mod_amp)
+        '''
 
         #ccgcrv trend, longtime scale, seasonal (harmonics), smooth data for obs
         #placeholder for ccgObsTrend, ccgObsPoly, ccgObsIav, ccgObsFun, ccgObsHarmo, ccgObsSmooth
@@ -887,7 +698,6 @@ class ConfCO2(Confrontation):
             ccgObsIav.data[whrData,ss] = ccgObsSmooth.data[whrData,ss] - ccgObsTrend.data[whrData,ss] - ccgObsHarmo.data[whrData,ss]
             ccgCrossDates = filt.getTrendCrossingDates()
             
-            print(ccgCrossDates)
             
             
             #write out Crossingdates
@@ -907,14 +717,7 @@ class ConfCO2(Confrontation):
                       os.mkdir((os.path.join(self.output_path, "ccg/seaCyleAmplitudeTrend/")))
                 np.savetxt(os.path.join(self.output_path,"ccg/seaCyleAmplitudeTrend/ccgAmplitude_%s_benchmark_lat%s.csv" % (self.name, obs.lat[ss])), ccgAmplitude, delimiter= ",", header="year, total_amplitude, max_date, max_value, min_date, min_value")
 
-        '''
-            #print("obs site", ss,"is finished!")
-        print("ccgObsIav:")
-        print(ccgObsIav)
-        print("ccgObsIav.data:")
-        print(ccgObsIav.data)
-        '''
-
+       
 
 
         #ccgcrv trend, longtime scale, seasonal (harmonics), smooth data for mod
@@ -936,9 +739,6 @@ class ConfCO2(Confrontation):
         ccgModSmooth = copy.deepcopy(mod)
         ccgModSmooth.name = "ccgSmooth"
 
-        print("siteNum:")
-        print(mod.ndata)
-
 
 
         for ss in range(0, mod.ndata):
@@ -946,14 +746,8 @@ class ConfCO2(Confrontation):
             whrData = np.where(mod.data[:,ss].mask==False)
             
             if len(whrData) > 0:
-                #print("mod", ss, "has real data instead of NaNs")
                 xp=(mod.time/365)[whrData]
-                print("whrData")
-                print(whrData)
-                print("xp")
-                print(xp)
                 yp=mod.data[:,ss][whrData]
-                print(yp)
                 #long term filter is 10 yrs
                 yrLongTerm = 10
                 filt = ccgfilt.ccgFilter(xp=xp,
@@ -977,18 +771,7 @@ class ConfCO2(Confrontation):
                 if ss == 5:
                     ccgAmplitude = filt.getAmplitudes()
                     np.savetxt(os.path.join(self.output_path,"ccg/seaCyleAmplitudeTrend/ccgAmplitude_%s_%s_lat%s.csv" % (self.name,m.name, mod.lat[ss])), ccgAmplitude, delimiter= ",", header="year, total_amplitude, max_date, max_value, min_date, min_value")
-                #print("mod site", ss,"is finished!")
-
-        print("miav.data:")
-        print(miav.data)
-
-        print("ccgModIAV:")
-        print(ccgModIav.data)
-
-
-        #Dump all ccg data into nc files
-        print((os.path.join(self.output_path,"%s_%s.nc" % (self.name,m.name))))
-
+                
         
 
         results = Dataset(os.path.join(self.output_path,"ccg/ccg_%s_%s.nc" % (self.name,m.name)), mode="w")
@@ -1009,16 +792,21 @@ class ConfCO2(Confrontation):
 
 
 
-
-
         #calculate score:
         # Amplitude score: for each site we compute the relative error
         # in amplitude and then score each site using the
         # exponential. The score for the model is then the arithmetic
         # mean across sites.
+        #SampTmp = -np.clip(np.abs(mod_amp.data-obs_amp.data)/obs_amp.data, 0, 6)
+       
+        
+        
         Samp = Variable(name  = "Amplitude Score global",
                         unit  = "1",
-                        data  = np.exp(-np.abs(mod_amp.data-obs_amp.data)/obs_amp.data).mean())
+                        #avoid underflow error
+                        data  = np.exp(-np.abs(np.array(mod_amp.data, dtype = np.float)/np.array(obs_amp.data, dtype = np.float) - 1)).mean())
+        
+        
 
         # Interannual variability score: similar to the amplitude
         # score, we also score the relative error in the stdev(iav)
@@ -1027,10 +815,10 @@ class ConfCO2(Confrontation):
         mstd = miav.data.std(axis=0)
         Siav = Variable(name  = "Interannual Variability Score global",
                         unit  = "1",
-                        data  = np.exp(-np.abs(mstd-ostd)/ostd).mean())
+                        #avoid underflow error
+                        data  = np.exp(-np.abs(np.array(mstd, dtype = np.float)/np.array(ostd, dtype = np.float) - 1)).mean())
 
-        print("ostd:")
-        print(ostd)
+
         # Min/Max Phase score: for each site we compute the phase
         # shift and normalize it linearly where a 0 day shift gets a
         # score of 1 and a 365/2 day shift is zero. We then compute a
@@ -1220,36 +1008,15 @@ class ConfCO2(Confrontation):
                 m_band_amp[i] =           mamp.data[ind].mean()
                 m_band_iav[i] =           miav.data.std(axis=0)[ind].mean()
 
-        print(o_band_min)
+
 
 
         a = np.append(o_band_min, o_band_max)
-
         for v in [o_band_amp, o_band_iav, m_band_min,m_band_max, m_band_amp, m_band_iav]:
             a = np.append(a, v)
-
-        #, o_band_amp, o_band_iav, m_band_min,m_band_max, m_band_amp, m_band_iav ).reshape(6,8)
-        '''
-        a =  np.concatenate(o_band_min, o_band_max, o_band_amp)
-
-        aa = np.concatenate(a, o_band_iav, m_band_min)
-        aaa = np.concatenate(aa, m_band_max, m_band_amp)
-        aaaa = np.concatenate(aaa, m_band_iav).reshape(6,8)
-        '''
-        #.reshape(6,8)
-
-        print("a:")
-        print(a)
-
         b = np.transpose(a.reshape(8,6))
-
-
-        print("b:")
-        print(b)
-
         np.savetxt(os.path.join(self.output_path,"zonalMean_%s_%s.csv" % (self.name,m.name)), b, delimiter=",", header = "o_band_min, o_band_max, o_band_amp, o_band_iav, m_band_min, m_band_max, m_band_amp, m_band_iav")
-        #, header = ['o_band_min', 'o_band_max', 'o_band_amp', 'o_band_iav', 'm_band_min', 'm_band_max', 'm_band_amp', 'm_band_iav'])
-
+       
 
 
         # To plot the mean values over latitude bands superimposed on
